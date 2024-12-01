@@ -6,12 +6,12 @@ g = 1.0;           % u    = g  at x = 1
 h = 0.0;           % -u,x = h  at x = 0
 
 % Setup the mesh
-pp   = 2;              % polynomial degree
-n_en = pp + 1;         % number of element or local nodes
-n_el = 2;              % number of elements
-n_np = n_el * pp + 1;  % number of nodal points
-n_eq = n_np - 1;       % number of equations
-n_int = 10;
+pp   = 2;              % polynomial degree （阶数）
+n_en = pp + 1;         % number of element nodes ( local nodes)  （每个元素占据几个原始节点）
+n_el = 2;              % number of elements  （网格中元素的数量）
+n_np = n_el * pp + 1;  % number of nodal points 
+n_eq = n_np - 1;       % number of equations 
+n_int = 10;      %%
 
 hh = 1.0 / (n_np - 1); % space between two adjacent nodes
 x_coor = 0 : hh : 1;   % nodal coordinates for equally spaced nodes
@@ -32,8 +32,8 @@ ID(end) = 0;
 [xi, weight] = Gauss(n_int, -1, 1);
 
 % allocate the stiffness matrix
-K = spalloc(n_eq, n_eq, (2*pp+1)*n_eq);
-F = zeros(n_eq, 1);
+K = spalloc(n_eq, n_eq, (2*pp+1)*n_eq);  %%
+F = zeros(n_eq, 1);  %%
 
 % Assembly of the stiffness matrix and load vector
 for ee = 1 : n_el
