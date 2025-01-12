@@ -1,10 +1,11 @@
+%% 备注
+% Developed by GaoYinjun
+% 自由度1是x方向，记为u自由度；自由度2是y方向，记为v自由度。
 clear;
 close all;
 clc;
 
-%% Note
-
-%% Parameters
+%% 参数
 traction = 10000.0;       % Pa or N/m^2
 RR        = 0.5;                % m
 LL         = 4.0;               % m
@@ -12,45 +13,101 @@ radius   = 1;                 % m, 变量
 theta     = 0;                 % rad, 变量
 E           = 1e9;              % Pa or N/m^2
 Poisson = 0.3;               % unity
-u = E/( 1 + 2 * Poisson );     % Pa or N/m^2, shear Modulus
+u = E / ( 2 * ( 1 + Poisson ) );     % Pa or N/m^2, shear Modulus
 lamda = ( Poisson * E ) / ( (1 + Poisson ) * ( 1 - 2 * Poisson ) ); % 拉梅系数
-D = [ lamda + 2 * u lamda 0; lamda lamda+2*u 0; 0 0 u];  % 模量矩阵Matrix
+D = [ lamda + 2 * u lamda 0; lamda lamda+2*u 0; 0 0 u];  % 模量矩阵Matrix，从书本公式2.7.32
 
-%% Exact solution for stress
+%% Exact solution for stress for Plate with Hole
 sigma_rr = @( r , theta )   ( traction / 2 ) * ( 1 - RR ^ 2 / radius ^ 2 ) + ( traction / 2 ) * ( 1 - 4 * RR ^ 2 / radius ^ 2 + 3 * RR ^ 4 / radius ^ 4 ) * cos( 2 * theta );
 sigma_tt = @( r , theta )   ( traction / 2 ) * ( 1 + RR ^ 2 / radius ^ 2 ) - ( traction / 2 ) * ( 1 + 3 * RR ^ 4 / radius ^ 4 ) * cos( 2 * theta );
 sigma_rt = @( r , theta )   - ( traction / 2 ) * ( 1 + 2 * R ^ 2 / radius ^ 2 - 3 * R ^ 4 / radius ^ 4 ) * sin( 2 * theta );
 
-%% Import mesh
+%% Exact manufatured solution for Question 3 Plate without holes
+% exact solution
+% exact = @(x,y) x*(1-x)*y*(1-y);
+% exact_x = @(x,y) (1-2*x)*y*(1-y);
+% exact_y = @(x,y) x*(1-x)*(1-2*y);
+% 二自由度, u''xx + u''yy = u'' = -f
+% exact solution for u
+exactu = @(x,y) x*(1-x)*y*(1-y);
+exactu_x = @(x,y) (1-2*x)*y*(1-y);
+exactu_y = @(x,y) x*(1-x)*(1-2*y);
+% source term for u
+% exact solution
+exactv = @(x,y) x*(1-x)*y*(1-y);
+exactv_x = @(x,y) (1-2*x)*y*(1-y);
+exactv_y = @(x,y) x*(1-x)*(1-2*y);
+% source term for v
 
-PlateWithHole;
+%% Import mesh
+Mesh1; % 运行从Gmsh导出的matlab格式的网格代码，以获取矩阵信息
 [ row, col ] = size( msh.QUADS );
 IEN= msh.QUADS( : , 1 : col - 1 );  %% 维数：单元数 * 4 （2048*4）
 nel = row;
 
-
 %% (or) Import mesh2
+% Mesh1; % 运行从Gmsh导出的matlab格式的网格代码，以获取矩阵信息
+% [ row, col ] = size( msh.QUADS );
+% IEN= msh.QUADS( : , 1 : col - 1 );  %% 维数：单元数 * 4 （2048*4）
+% nel = row;
 
 %% (or) Import mesh3
+% Mesh1; % 运行从Gmsh导出的matlab格式的网格代码，以获取矩阵信息
+% [ row, col ] = size( msh.QUADS );
+% IEN= msh.QUADS( : , 1 : col - 1 );  %% 维数：单元数 * 4 （2048*4）
+% nel = row;
 
 %% (or) Import mesh4
+% Mesh1; % 运行从Gmsh导出的matlab格式的网格代码，以获取矩阵信息
+% [ row, col ] = size( msh.QUADS );
+% IEN= msh.QUADS( : , 1 : col - 1 );  %% 维数：单元数 * 4 （2048*4）
+% nel = row;
 
 %% ID, IEN and LM Array
-LM = ID( IEN );
+ID = zeros( row, 1 );
+LM = zeros( row, 1 );
+counter = 0;
+for ny = 2 : size(msh.NODES, 1) - 1
+    for nx = 2 : size(msh.NODES, 2) - 1
+        index = (ny-1) * size(msh.NODES, 2) + nx;
+        counter = counter + 1;
+        ID(index) = counter;
+    end
+end
+n_eq = counter * 2; % 二维问题每个节点有两个自由度
 
-%%
+%% 生成坐标
+x_coor = msh.NODES( : , 1 );
+y_coor = msh.NODES( : , 2 );
 
-% allocate the stiffness matrix and load vector
-K = spalloc(n_eq, n_eq, 9 * n_eq);
-F = zeros(n_eq, 1);
+%% 生成形函数及其导数
+function [val_xi, val_eta] = Quad_grad(aa, xi, eta)
+    if aa == 1
+        val_xi  = -0.25 * (1-eta);
+        val_eta = -0.25 * (1-xi);
+    elseif aa == 2
+        val_xi  =  0.25 * (1-eta);
+        val_eta = -0.25 * (1+xi);
+    elseif aa == 3
+        val_xi  = 0.25 * (1+eta);
+        val_eta = 0.25 * (1+xi);
+    elseif aa == 4
+        val_xi  = -0.25 * (1+eta);
+        val_eta = 0.25 * (1-xi);
+    else
+        error('Error: value of a should be 1,2,3, or 4.');
+    end
+end
 
-% loop over element to assembly the matrix and vector
+% 组装K和F
+K = spalloc( n_eq , n_eq , 9 * n_eq );
+F = zeros( n_eq , 1 );
+%类似二维传热的求解单元场的循环结构
 for ee = 1 : n_el   % 第一层循环-对每个单元
     x_ele = x_coor( IEN(ee, 1:n_en) );
     y_ele = y_coor( IEN(ee, 1:n_en) );
-    
-    k_ele = zeros(n_en, n_en);
-    f_ele = zeros(n_en, 1);
+    k_ele = zeros(2*n_en, 2*n_en);  % 原因：2*n_en是因为二维线弹性，位移是两个自由度的
+    f_ele = zeros(2*n_en, 1);
     
     for ll = 1 : n_int % 第二层循环-quadrature循环
         x_l = 0.0; y_l = 0.0;
@@ -138,3 +195,22 @@ end
 
 % solve the stiffness matrix
 dn = K \ F;
+
+% insert dn back into the vector for all nodes
+disp = zeros( size(msh.NODES, 1), 1 );
+
+for ii = 1 : size(msh.NODES, 1)
+    index = ID(ii);
+    if index > 0
+        disp(ii, 1) = dn(index);
+        disp(ii, 2) = dn(index + 1);
+    end
+end
+
+save("HEAT", "disp", "n_el_x", "n_el_y");
+
+figure;
+quiver(msh.NODES( : , 1 ), msh.NODES( : , 2 ), disp( : , 2 ), disp( : , 1 ), 'Color', 'r');
+title('Displacement Field');
+xlabel('X');
+ylabel('Y');
