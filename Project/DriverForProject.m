@@ -15,12 +15,14 @@ E           = 1e9;              % Pa or N/m^2
 Poisson = 0.3;               % unity
 u = E / ( 2 * ( 1 + Poisson ) );     % Pa or N/m^2, shear Modulus
 lamda = ( Poisson * E ) / ( (1 + Poisson ) * ( 1 - 2 * Poisson ) ); % 拉梅系数
-D = [ lamda + 2 * u lamda 0; lamda lamda+2*u 0; 0 0 u];  % 模量矩阵Matrix，从书本公式2.7.32
+% 模量矩阵D:
+D = ( E / ( 1 - Poisson ^ 2))* [ 1, Poisson, 0; Poisson, 1, 0; 0, 0, (1 - Poisson) /2]; % 平面应力
+% D = [ lamda + 2 * u, lamda, 0; lamda, lamda+2*u, 0; 0, 0, u];  % 平面应变
 
-%% Exact solution for stress for Plate with Hole
-sigma_rr = @( r , theta )   ( traction / 2 ) * ( 1 - RR ^ 2 / radius ^ 2 ) + ( traction / 2 ) * ( 1 - 4 * RR ^ 2 / radius ^ 2 + 3 * RR ^ 4 / radius ^ 4 ) * cos( 2 * theta );
-sigma_tt = @( r , theta )   ( traction / 2 ) * ( 1 + RR ^ 2 / radius ^ 2 ) - ( traction / 2 ) * ( 1 + 3 * RR ^ 4 / radius ^ 4 ) * cos( 2 * theta );
-sigma_rt = @( r , theta )   - ( traction / 2 ) * ( 1 + 2 * R ^ 2 / radius ^ 2 - 3 * R ^ 4 / radius ^ 4 ) * sin( 2 * theta );
+% %% Exact solution for stress for Plate with Hole
+% sigma_rr = @( r , theta )   ( traction / 2 ) * ( 1 - RR ^ 2 / radius ^ 2 ) + ( traction / 2 ) * ( 1 - 4 * RR ^ 2 / radius ^ 2 + 3 * RR ^ 4 / radius ^ 4 ) * cos( 2 * theta );
+% sigma_tt = @( r , theta )   ( traction / 2 ) * ( 1 + RR ^ 2 / radius ^ 2 ) - ( traction / 2 ) * ( 1 + 3 * RR ^ 4 / radius ^ 4 ) * cos( 2 * theta );
+% sigma_rt = @( r , theta )   - ( traction / 2 ) * ( 1 + 2 * R ^ 2 / radius ^ 2 - 3 * R ^ 4 / radius ^ 4 ) * sin( 2 * theta );
 
 %% Exact manufatured solution for Question 3 Plate without holes
 % exact solution
@@ -38,78 +40,88 @@ exactv = @(x,y) x*(1-x)*y*(1-y);
 exactv_x = @(x,y) (1-2*x)*y*(1-y);
 exactv_y = @(x,y) x*(1-x)*(1-2*y);
 % source term for v
+f = @(x, y) [ 2 * E / ( Poisson ^ 2 - 1 ); 0 ];
 
+n_en = 4;
+n_int = 3;
+n_qua = 3;
+n_sd = 2;
 %% Import mesh
 Mesh1; % 运行从Gmsh导出的matlab格式的网格代码，以获取矩阵信息
 [ row, col ] = size( msh.QUADS );
-IEN= msh.QUADS( : , 1 : col - 1 );  %% 维数：单元数 * 4 （2048*4）
+IEN= msh.QUADS( : , 1 : col - 1 );  % 维数：单元数 * 4 （2048*4）
 nel = row;
+x_coor = msh.POS(:,1);
+x_coor = msh.POS(:,2);
+n_np = length(x_coor); % 验证，15个全局节点
+
 
 %% (or) Import mesh2
 % Mesh1; % 运行从Gmsh导出的matlab格式的网格代码，以获取矩阵信息
 % [ row, col ] = size( msh.QUADS );
-% IEN= msh.QUADS( : , 1 : col - 1 );  %% 维数：单元数 * 4 （2048*4）
+% IEN= msh.QUADS( : , 1 : col - 1 );  % 维数：单元数 * 4 （2048*4）
 % nel = row;
+
 
 %% (or) Import mesh3
 % Mesh1; % 运行从Gmsh导出的matlab格式的网格代码，以获取矩阵信息
 % [ row, col ] = size( msh.QUADS );
-% IEN= msh.QUADS( : , 1 : col - 1 );  %% 维数：单元数 * 4 （2048*4）
+% IEN= msh.QUADS( : , 1 : col - 1 );  % 维数：单元数 * 4 （2048*4）
 % nel = row;
 
 %% (or) Import mesh4
 % Mesh1; % 运行从Gmsh导出的matlab格式的网格代码，以获取矩阵信息
 % [ row, col ] = size( msh.QUADS );
-% IEN= msh.QUADS( : , 1 : col - 1 );  %% 维数：单元数 * 4 （2048*4）
+% IEN= msh.QUADS( : , 1 : col - 1 );  % 维数：单元数 * 4 （2048*4）
 % nel = row;
 
 %% ID, IEN and LM Array
-ID = zeros( row, 1 );
-LM = zeros( row, 1 );
-counter = 0;
-for ny = 2 : size(msh.NODES, 1) - 1
-    for nx = 2 : size(msh.NODES, 2) - 1
-        index = (ny-1) * size(msh.NODES, 2) + nx;
-        counter = counter + 1;
-        ID(index) = counter;
+n_int_xi = 3;
+n_int_eta = 3;
+[xi, eta, weight] = Gauss2D(n_int_xi, n_int_eta);
+
+% 边界条件
+ID = ones( n_np, 2 );
+% 对每一行进行处理
+for i = 1: size(msh.LINES,1)
+    if msh.LINES(i, 3) == 11 % 底边
+        ID(msh.LINES(i, 1),2) = 0; % 限制该边上所有点的ID值y自由度被限制
+        ID(msh.LINES(i, 2),2) = 0;
+    elseif  msh.LINES(i, 3) == 10 % 左边
+        ID(msh.LINES(i, 1),1) = 0; % 限制该边上所有点的ID值x自由度被限制
+        ID(msh.LINES(i, 2),1) = 0;
     end
 end
+
+% 以上经过验证，Mesh1到Mesh4都没问题
+
+n_np_x = n_el_x + 1;
+n_np_y = n_el_y + 1;
+% LM = zeros( , 1 );
+
+node_indices = IEN;
+node_coords = ID;
+LM = node_coords(:, node_indices);
+LM = reshape(LM, 2, n_el, n_en);
+
 n_eq = counter * 2; % 二维问题每个节点有两个自由度
 
-%% 生成坐标
-x_coor = msh.NODES( : , 1 );
-y_coor = msh.NODES( : , 2 );
+% 验证LM组装正确
+% ID = [1,3,0,5,7,9,0,12;2,4,0,6,8,10,11,13];
+% IEN = [1,1,4,8;2,3,3,6;8,4,5,5;7,2,6,7];
+% LM = [1,1,5,12;2,2,6,13;3,0,0,9;4,0,0,10;12,5,7,7;13,6,8,8;0,3,4,0;11,4,10,11];
 
-%% 生成形函数及其导数
-function [val_xi, val_eta] = Quad_grad(aa, xi, eta)
-    if aa == 1
-        val_xi  = -0.25 * (1-eta);
-        val_eta = -0.25 * (1-xi);
-    elseif aa == 2
-        val_xi  =  0.25 * (1-eta);
-        val_eta = -0.25 * (1+xi);
-    elseif aa == 3
-        val_xi  = 0.25 * (1+eta);
-        val_eta = 0.25 * (1+xi);
-    elseif aa == 4
-        val_xi  = -0.25 * (1+eta);
-        val_eta = 0.25 * (1-xi);
-    else
-        error('Error: value of a should be 1,2,3, or 4.');
-    end
-end
-
-% 组装K和F
-K = spalloc( n_eq , n_eq , 9 * n_eq );
+%% 组装K和F
+K = spalloc( n_eq , n_eq ,  n_eq * (2*(n_en-1)+1) ); % 稀疏矩阵内的信息数是多少呢，存疑
 F = zeros( n_eq , 1 );
 %类似二维传热的求解单元场的循环结构
-for ee = 1 : n_el   % 第一层循环-对每个单元
+for ee = 1 : n_el   % 第一层循环-对每个单元 这个for循环将自由度修正（对比二维传热）
     x_ele = x_coor( IEN(ee, 1:n_en) );
     y_ele = y_coor( IEN(ee, 1:n_en) );
     k_ele = zeros(2*n_en, 2*n_en);  % 原因：2*n_en是因为二维线弹性，位移是两个自由度的
     f_ele = zeros(2*n_en, 1);
     
-    for ll = 1 : n_int % 第二层循环-quadrature循环
+    for ll = 1 : n_int % 第二层循环-quadrature循环 Kelement 和 形函数及其导
         x_l = 0.0; y_l = 0.0;
         dx_dxi = 0.0; dx_deta = 0.0;
         dy_dxi = 0.0; dy_deta = 0.0;
@@ -130,17 +142,34 @@ for ee = 1 : n_el   % 第一层循环-对每个单元
             [Na_xi, Na_eta] = Quad_grad(aa, xi(ll), eta(ll));
             Na_x = (Na_xi * dy_deta - Na_eta * dy_dxi) / detJ;
             Na_y = (-Na_xi * dx_deta + Na_eta * dx_dxi) / detJ;
+            Ba = [ Na_x , 0 ;  0 , Na_y ; Na_y , Na_x ]; % 书本3.10.6 1 ≤ a ≤ nen
+            Ba = Ba'; % 积分项计算中位于左边，需转置保证维数正确
+%             f_ele(aa) = f_ele(aa) + weight(ll) * detJ * f(x_l, y_l) * Na;
+%             
+            % 俩自由度，称为dof
             
-            f_ele(aa) = f_ele(aa) + weight(ll) * detJ * f(x_l, y_l) * Na;
-            
-            for bb = 1 : n_en 
-                Nb = Quad(bb, xi(ll), eta(ll));
-                [Nb_xi, Nb_eta] = Quad_grad(bb, xi(ll), eta(ll));
-                Nb_x = (Nb_xi * dy_deta - Nb_eta * dy_dxi) / detJ;
-                Nb_y = (-Nb_xi * dx_deta + Nb_eta * dx_dxi) / detJ;
+            for dof_x = 1 : 2 % Kpq 先搞定p
+                pp = 2*(aa-1)+dof_x;
+                f_ele(pp) = f_ele(pp) + weight(ll) * Na * detJ; % source term 应补充
                 
-                k_ele(aa, bb) = k_ele(aa,bb) + weight(ll) * detJ * kappa * (Na_x * Nb_x + Na_y * Nb_y);
-            end % end of bb loop
+                for bb = 1 : n_en 
+                    Nb = Quad(bb, xi(ll), eta(ll));
+                    [Nb_xi, Nb_eta] = Quad_grad(bb, xi(ll), eta(ll));
+                    Nb_x = (Nb_xi * dy_deta - Nb_eta * dy_dxi) / detJ;
+                    Nb_y = (-Nb_xi * dx_deta + Nb_eta * dx_dxi) / detJ;
+                    Bb = [ Nb_x , 0 ; 0 , Nb_y ; Nb_y , Nb_x ]; % 书本3.10.6 1 ≤ a ≤ nen 位于右边，不用转置
+
+%                     k_ele(aa, bb) = k_ele(aa,bb) + weight(ll) * detJ * kappa * (Na_x * Nb_x + Na_y * Nb_y);
+                        extra_term = weight(ll) * detJ * Ba * D * Bb;
+                    for dof_y = 1 : 2
+                        % 行和列的影响
+                        qq = 2*(bb-1)+dof_y;
+                        k_ele(pp, qq) = k_ele(pp, qq) + extra_term(dof_x,dof_y);
+                    end
+                    
+                end % end of bb loop
+            end
+            
         end % end of aa loop
     end % end of quadrature loop
    
@@ -148,6 +177,7 @@ for ee = 1 : n_el   % 第一层循环-对每个单元
     
     for aa = 1 : n_en
         % 有两个自由度，则为了组装全局K，每个局部节点（aa）应该分析1方向和2方向。
+        % 运用多维IEN、LM表达
         PP1 = LM( ee , 2 * aa-1 ); % 原因：空间维数是二，且二维线弹性，关心两个自由度。
         PP2 = LM( ee , 2 * aa );    % 原因：空间维数是二，且二维线弹性，关心两个自由度。
        
@@ -197,20 +227,60 @@ end
 dn = K \ F;
 
 % insert dn back into the vector for all nodes
-disp = zeros( size(msh.NODES, 1), 1 );
-
-for ii = 1 : size(msh.NODES, 1)
-    index = ID(ii);
+disp = zeros( n_np, 2 );
+% 先逐列再逐行赋予displacement值，暂未考虑纽曼条件
+for ii = 1 : n_np
+    countering = ID(ii);
     if index > 0
-        disp(ii, 1) = dn(index);
-        disp(ii, 2) = dn(index + 1);
+        disp(ii, 1) = dn(countering);
+        disp(ii, 2) = dn(countering + 1);
+    else 
+        disp(ii,1) = g;
+        disp(ii,2) = g;
     end
 end
 
-save("HEAT", "disp", "n_el_x", "n_el_y");
+save("Q1", "disp", "n_el_x", "n_el_y");
 
-figure;
-quiver(msh.NODES( : , 1 ), msh.NODES( : , 2 ), disp( : , 2 ), disp( : , 1 ), 'Color', 'r');
-title('Displacement Field');
+% figure;
+% quiver(msh.NODES( : , 1 ), msh.NODES( : , 2 ), disp( : , 2 ), disp( : , 1 ), 'Color', 'r');
+
+load("Q1.mat");
+hh_x = 1.0 / n_el_x;
+hh_y = 1.0 / n_el_y;
+
+
+
+% 两个自由度，分x和y呈现
+figure(1)
+title('X dof: Displacement Field');
 xlabel('X');
 ylabel('Y');
+disp_x=disp(:,1);
+[X, Y] = meshgrid(0 : hh_x : 1, 0 : hh_y : 1);
+Z = reshape(disp_x, n_np_x, n_np_y)';
+surf(X, Y, Z);
+
+shading interp
+
+az = -61;
+el = 20;
+view(az,el);
+
+hold on;
+
+% y
+figure(2)
+title('Y dof: Displacement Field');
+xlabel('X');
+ylabel('Y');
+disp_y=disp(:,2);
+[X, Y] = meshgrid(0 : hh_x : 1, 0 : hh_y : 1);
+Z = reshape(disp_y, n_np_x, n_np_y)';
+surf(X, Y, Z);
+
+shading interp
+
+az = -61;
+el = 20;
+view(az,el);
