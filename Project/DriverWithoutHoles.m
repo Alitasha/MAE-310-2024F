@@ -169,7 +169,7 @@ for ee = 1 : n_el   % 第一层循环-对每个单元 这个for循环将自由�
             
         end % end of aa loop
     end % end of quadrature loop
-   
+    
     
     for aa = 1 : n_en
         Note1 = IEN(ee,aa);
@@ -263,3 +263,62 @@ az = -61;
 el = 20;
 view(az,el);
 
+% Error and Convergence
+% 对每个单元（循环1）找单元坐标，每个积分点（循环2）计算换元，跑所有单元内的节点（循环3）计算dxdxi
+lnL2 = zeros(1,n_el);
+lnH1 = zeros(1,n_el);
+% Error terms
+
+% [xi, eta, weight] = Gauss2D(10, 10);
+% L2_top = 0.0; L2_bot = 0.0; H1_top = 0.0; H1_bot = 0.0;
+% for ee = 1 : n_el
+%     x_ele = x_coor( IEN(ee, 1:n_en) );
+%     y_ele = y_coor( IEN(ee, 1:n_en) );
+%     u_ele = disp(IEN(ee,1:n_en),:);
+%     for ll = 1 : 100
+%         x_l = 0.0; y_l = 0.0;
+%         dx_dxi = 0.0; dx_deta = 0.0;
+%         dy_dxi = 0.0; dy_deta = 0.0;
+%         uh = 0.0; uh_xi = 0.0; uh_eta = 0.0;
+%         du_dxi = 0.0;
+%         for aa = 1 : n_en % 注意u的两个分量
+%             x_l = x_l + x_ele(aa) * Quad(aa, xi(ll), eta(ll));
+%             y_l = y_l + y_ele(aa) * Quad(aa, xi(ll), eta(ll));
+%             %             u_h = uh + u_ele(aa) * Quad(aa, xi(ll), eta(ll));
+%             u_h(1) = u_h(1) + u_ele(aa,1) * Quad(aa, xi(ll), eta(ll));
+%             u_h(2) = u_h(2) + u_ele(aa,2) * Quad(aa, xi(ll), eta(ll));
+%             [Na_xi, Na_eta] = Quad_grad(aa, xi(ll), eta(ll));
+%             dx_dxi  = dx_dxi  + x_ele(aa) * Na_xi;
+%             dx_deta = dx_deta + x_ele(aa) * Na_eta;
+%             dy_dxi  = dy_dxi  + y_ele(aa) * Na_xi;
+%             dy_deta = dy_deta + y_ele(aa) * Na_eta;
+%             du_dxi = du_dxi + u_ele(aa,:)  * Na_xi;
+%             du_deta = du_deta + u_ele(aa,:)  * Na_eta;
+%             
+%         end
+%         
+%         dxi_dx = 1 / dx_dxi;
+%         deta_dy = 1 / dy_deta;
+%         detJ = dx_dxi * dy_deta - dx_deta * dy_dxi;
+%         %         L2_top = L2_top + weight(ll) * (uh - exact(x_l))^2 * dx_dxi;
+%         %         L2_bot = L2_bot + weight(ll) * exact(x_l)^2 * dx_dxi;
+%         %         from HW 4
+%         %         H1_top = H1_top + weight(ll) * ( uh_xi * dxi_dx - exact_x(x_l) )^2 * dx_dxi;
+%         %         H1_bot = H1_bot + weight(ll) * exact_x(x_l)^2 * dx_dxi;
+%         % 2 dof for exact solution and approximated solution
+%         Matrix1 = exact_u(x_l,y_l);
+%         Matrix1Der = exact_uu(x_l,y_l);
+%         L2_top = L2_top + weight(ll) * (uh - exact_x(x_l))^2 * dx_dxi; % 在Exact后添加对应分量
+%         
+%         
+%         
+%     end
+%     
+%     
+%     
+% end
+% L2_top = sqrt(L2_top); L2_bot = sqrt(L2_bot);
+% H1_top = sqrt(H1_top); H1_bot = sqrt(H1_bot);
+% 
+% L2_error = L2_top / L2_bot;
+% H1_error = H1_top / H1_bot;
